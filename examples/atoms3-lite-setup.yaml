@@ -1,0 +1,24 @@
+# Developer build of the runtime fixture setup portal. See docs/runtime-setup.md.
+esphome:
+  name: odelic-bridge
+  friendly_name: Odelic bridge
+substitutions:
+  odelic_setup_username: !secret setup_username
+  odelic_setup_password: !secret setup_password
+packages:
+  odelic: !include ../packages/atoms3-lite-setup.yaml
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [odelic, odelic_controller, odelic_setup]
+api:
+  encryption:
+    key: !secret api_encryption_key
+ota:
+  - platform: esphome
+    encryption:
+      key: !secret api_encryption_key
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password

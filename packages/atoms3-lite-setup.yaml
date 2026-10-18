@@ -1,0 +1,34 @@
+# Runtime roster: one shared BLE transport, up to eight saved fixtures.
+substitutions:
+  odelic_max_lights: "8"
+esphome:
+  min_version: 2026.9.1
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+esp32_ble_tracker:
+  scan_parameters:
+    active: false
+    duration: 5s
+ble_client:
+  - mac_address: "00:00:00:00:00:00"
+    id: fixture_ble
+    auto_connect: false
+odelic:
+  id: fixture
+  ble_client_id: fixture_ble
+  lighting_id: "00000000"
+  update_interval: 5s
+odelic_controller:
+  id: fixture_controller
+  odelic_id: fixture
+  max_lights: ${odelic_max_lights}
+odelic_setup:
+  controller_id: fixture_controller
+  username: ${odelic_setup_username}
+  password: ${odelic_setup_password}
+  max_lights: ${odelic_max_lights}

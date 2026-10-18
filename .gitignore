@@ -1,0 +1,9 @@
+.venv/
+.esphome/
+**/.esphome/
+__pycache__/
+secrets.yaml
+**/secrets.yaml
+local/
+captures/
+.DS_Store

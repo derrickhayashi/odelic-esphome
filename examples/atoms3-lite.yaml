@@ -1,0 +1,24 @@
+# Developer workflow; normal installation is described in docs/device-builder.md.
+esphome:
+  name: odelic-bridge
+  friendly_name: Odelic bridge
+substitutions:
+  odelic_light_mac: !secret light_mac
+  odelic_lighting_id: !secret lighting_id
+packages:
+  odelic: !include ../packages/atoms3-lite.yaml
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [odelic, odelic_controller]
+api:
+  encryption:
+    key: !secret api_encryption_key
+ota:
+  - platform: esphome
+    encryption:
+      key: !secret api_encryption_key
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password

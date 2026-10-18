@@ -1,0 +1,33 @@
+# Static fixture roster for AtomS3 Lite. Network/API credentials belong in the local device YAML.
+substitutions:
+  odelic_unit: "0"
+  odelic_light_name: Ceiling light
+esphome:
+  min_version: 2026.9.1
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+esp32_ble_tracker:
+ble_client:
+  - mac_address: "00:00:00:00:00:00"
+    id: fixture_ble
+    auto_connect: false
+odelic:
+  id: fixture
+  ble_client_id: fixture_ble
+  lighting_id: "00000000"
+  update_interval: 5s
+odelic_controller:
+  id: fixture_controller
+  odelic_id: fixture
+  fixtures:
+    - id: ceiling_light
+      name: ${odelic_light_name}
+      mac_address: "${odelic_light_mac}"
+      lighting_id: "${odelic_lighting_id}"
+      unit: ${odelic_unit}
+      root_device: true

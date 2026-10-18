@@ -1,0 +1,17 @@
+# Add this fragment to the device YAML created by ESPHome Device Builder.
+# Keep its existing esphome, wifi, api (including encryption key), and ota blocks.
+# Fill the two fixture secret entries described in docs/device-builder.md.
+substitutions:
+  odelic_light_mac: !secret odelic_light_mac
+  odelic_lighting_id: !secret odelic_lighting_id
+packages:
+  odelic:
+    url: https://github.com/derrickhayashi/odelic-esphome
+    ref: main
+    files: [packages/atoms3-lite.yaml]
+external_components:
+  - source:
+      type: git
+      url: https://github.com/derrickhayashi/odelic-esphome
+      ref: main
+    components: [odelic, odelic_controller]

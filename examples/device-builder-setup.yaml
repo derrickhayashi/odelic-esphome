@@ -1,0 +1,16 @@
+# Append to a Device Builder device configuration; keep its Wi-Fi/API/OTA/name.
+# Remove the wizard's esp32 block; this package supplies the actual board.
+substitutions:
+  odelic_setup_username: !secret odelic_setup_username
+  odelic_setup_password: !secret odelic_setup_password
+packages:
+  odelic:
+    url: https://github.com/derrickhayashi/odelic-esphome
+    ref: main
+    files: [packages/atoms3-lite-setup.yaml]
+external_components:
+  - source:
+      type: git
+      url: https://github.com/derrickhayashi/odelic-esphome
+      ref: main
+    components: [odelic, odelic_controller, odelic_setup]
