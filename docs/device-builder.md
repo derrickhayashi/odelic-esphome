@@ -6,9 +6,9 @@ AtomS3 Lite. Device Builder is also used to install the optional
 instead if you need runtime fixture management.
 Use ESPHome 2026.9.1 for the currently tested version. Configuration validation
 and compilation have been tested separately from the Device Builder UI; see
-[validation](validation.md). This guide assumes the repository is public and the package files have been
-pushed to the selected branch. It does not change the repository visibility;
-anonymous import will work only after publication.
+[validation](validation.md). The source repository is public; package imports
+must reference a branch or revision containing the selected files. Live remote
+imports and the Device Builder browser workflow still need validation.
 
 ## 1. Open Device Builder
 
@@ -142,11 +142,18 @@ odelic_controller:
 Each `id` must be unique and should remain unchanged: it determines the stable
 Home Assistant sub-device identity. The display `name` can change without
 changing that identity. MAC addresses must also be unique. Static and runtime
-rosters use the same shared BLE scheduler, bounded queues, fresh-read-before-write
-rule, entities, and state-valid behavior. Only their configuration source differs.
-One connection is active at a time, so additional or unreachable lights increase
-feedback and command latency. Static multi-light firmware has compiled, but has
-not received physical multi-light validation.
+rosters use the same independent per-fixture BLE sessions, bounded queues,
+fresh-read-before-write rule, entities and state-valid behavior. Only their
+configuration source differs. Healthy fixture connections stay open while other
+fixtures reconnect. The packages reserve eight BLE connection slots; keep
+`esp32_ble.max_connections` at least as large as the controller's reserved
+`max_lights` (and account for any other BLE clients). The existing eight-fixture
+capacity and identities are unchanged. See [concurrent BLE sessions](concurrent-ble.md).
+
+The concurrent firmware passed two-light power, brightness, preset and isolation
+checks with physical confirmation. First-state readback had a 1.20-second median
+in the short acceptance test. Offline recovery and larger-roster reliability
+remain untested. See [validation](validation.md).
 
 The package keeps its original first light on the bridge device with its existing
 name, preserving the installed one-light layout. Additional records are exposed

@@ -5,12 +5,13 @@
 #include <array>
 
 namespace esphome::odelic_controller {
+// Roster/storage compatibility limit; independent BLE sessions are reserved at build time.
 constexpr size_t MAX_LIGHTS = 8;
 
 class OdelicController : public Component, public odelic::FixtureCommandSink {
  public:
-  void set_capacity(size_t capacity) { capacity_ = capacity; }
-  void set_hub(odelic::OdelicHub *hub) { hub_ = hub; }
+  void set_capacity(size_t capacity) { this->capacity_ = capacity; }
+  void set_slot_hub(size_t slot, odelic::OdelicHub *hub) { this->slots_[slot].hub = hub; }
   void set_slot(size_t slot, odelic::OdelicLight *output, RosterLightState *state, RosterPreset *preset,
                 RosterValid *valid);
   void set_record(size_t slot, uint32_t uid, const std::string &name, uint64_t mac, const std::string &lighting_id,
@@ -23,8 +24,7 @@ class OdelicController : public Component, public odelic::FixtureCommandSink {
   float get_setup_priority() const override { return setup_priority::LATE; }
   void pause();
   void resume();
-  int active_slot() const { return active_slot_; }
-  bool transport_idle() const { return hub_->parent()->state() == esp32_ble_tracker::ClientState::IDLE; }
+  bool transport_idle() const;
 
  protected:
   struct Record {
@@ -37,23 +37,19 @@ class OdelicController : public Component, public odelic::FixtureCommandSink {
   };
   struct RuntimeSlot {
     Device device;
+    odelic::OdelicHub *hub{nullptr};
     odelic::OdelicLight *output{nullptr};
     RosterLightState *state{nullptr};
     RosterPreset *preset{nullptr};
     RosterValid *valid{nullptr};
     odelic::protocol::Intent queued{};
-    uint32_t queued_at{0}, seen_at{0}, visited_at{0};
-    bool seen{false}, visited{false};
+    uint32_t queued_at{0}, seen_at{0}, observed_revision{0};
+    bool started{false}, seen{false};
   };
-  size_t record_count_() const;
   void register_entities_();
-  void schedule_();
-  odelic::OdelicHub *hub_{nullptr};
   std::array<Record, MAX_LIGHTS> records_{};
   std::array<RuntimeSlot, MAX_LIGHTS> slots_{};
-  size_t capacity_{MAX_LIGHTS}, next_slot_{0};
-  int active_slot_{-1};
-  uint32_t visit_at_{0}, read_at_{0}, observed_revision_{0};
-  bool current_read_{false}, initialized_{false}, paused_{true};
+  size_t capacity_{MAX_LIGHTS};
+  bool initialized_{false}, paused_{true};
 };
 }  // namespace esphome::odelic_controller

@@ -8,8 +8,8 @@ This is an implementation under hardware validation, not a tested public release
 
 The YAML-configured roster remains supported and now uses the same fixture
 controller and scheduler. Use the setup package below only when you want runtime
-fixture configuration, persistence, discovery, and editing. It uses one BLE client
-and rotates between the saved lights; do not combine it with other BLE clients,
+fixture configuration, persistence, discovery, and editing. It reserves an independent BLE client and protocol session per roster slot,
+keeping configured fixtures connected; do not combine it with other BLE clients,
 static light/select/sensor definitions, manually defined sub-devices, or a Bluetooth
 proxy. Both paths still require the existing eight-digit ID from ConnectedLighting.
 
@@ -99,7 +99,7 @@ or overflowing scan is inconclusive. Two scans per stage reduce transient misses
 they cannot prove ownership if the wrong circuit was switched or RF losses happen
 to mimic power loss.
 
-During the guide the bridge disconnects from its current fixture, clears all
+During the guide the bridge disconnects all fixture sessions, clears all
 pending light commands and marks every saved fixture's state invalid. Power, brightness and preset requests are
 ignored. Cancellation, failure, or the five-minute timeout restores normal query
 operation for the previously saved lights, without saving candidates. Always
@@ -114,23 +114,29 @@ adding when full; editing and removal remain available. Do not reduce the build
 capacity below occupied slots. An incompatible stored list is locked against
 replacement until you restore the previous capacity/configuration.
 
-Only one BLE fixture connection is active at a time. Normal polling visits the
-saved lights in turn; pending user requests receive priority without starving
-overdue polling. A connection/query visit is bounded to 20 seconds, so an offline
-light cannot block all others indefinitely. A healthy single-light configuration
-can stay connected. More lights or weak links mean longer feedback/control delays;
-eight is a storage/build limit, not a hardware reliability claim.
+Each configured fixture has its own persistent BLE connection, login/session
+state, MAC-matched mesh address and polling. The capacity remains 1–8 fixtures;
+unused reserved slots never connect. An offline fixture reconnects independently
+and does not make healthy fixtures disconnect. The shared concurrent controller
+has passed a two-fixture static hardware test; runtime setup and offline recovery
+still require hardware acceptance.
+
+Both packages reserve eight BLE stack slots by default. `esp32_ble.max_connections`
+must cover the controller's `max_lights` plus any other BLE clients. Lower both
+values together for a smaller runtime build, along with `odelic_setup.max_lights`;
+using the `odelic_max_lights` substitution keeps the two roster capacities aligned.
+Eight is a configured/build ceiling, not a proven eight-fixture reliability claim.
+See [concurrent BLE sessions](concurrent-ble.md) for stack resources and limits.
 
 Each fixture has its own coalescing pending request. It is applied only after a
 fresh MAC-matched query on that fixture's connection. Requests expire after 60
-seconds and dispatched requests are never replayed after switching/disconnection.
+seconds and dispatched requests are never replayed after disconnection.
 Starting discovery or saving the roster clears all pending requests. Power,
 brightness and presets still use individually addressed protocol messages.
 
-Each state-valid diagnostic records recent actual readback. It can remain valid
-between intentional rotation visits; it becomes false when polling times out,
-state gets stale, or discovery pauses control. The stale threshold is
-`30 seconds + 25 seconds × configured light count`. The light entity retains its
+Each state-valid diagnostic records recent actual readback. It becomes false on
+disconnection, query failure, discovery pause, or after 30 seconds without a new
+confirmed readback. This threshold is independent of roster size. The light entity retains its
 last confirmed values; invalid state is not a confirmed OFF result.
 
 Saved sub-device identities are independent of display names and storage slots.

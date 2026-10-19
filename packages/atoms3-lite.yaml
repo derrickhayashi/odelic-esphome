@@ -11,6 +11,9 @@ esp32:
     type: esp-idf
 logger:
   hardware_uart: USB_SERIAL_JTAG
+# One persistent client per roster slot; eight preserves the existing fixture limit.
+esp32_ble:
+  max_connections: 8
 esp32_ble_tracker:
 ble_client:
   - mac_address: "00:00:00:00:00:00"

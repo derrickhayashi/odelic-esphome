@@ -22,16 +22,17 @@
 - Research/debugging repository: `odelic-research` (separate checkout);
   private GitHub origin: https://github.com/derrickhayashi/odelic-research
 - This ESPHome repository: `odelic-esphome`;
-  private GitHub origin: https://github.com/derrickhayashi/odelic-esphome
+  public GitHub origin: https://github.com/derrickhayashi/odelic-esphome
 - Server-side Home Assistant integration: `odelic-home-assistant` (design only);
   private GitHub origin: https://github.com/derrickhayashi/odelic-home-assistant
 
 The three Git repositories have independent status and history. Explicitly
 select the working directory and read that repository's agent instructions before
 editing or pushing. A push here does not update the research repository. Keep all
-GitHub repositories private unless the user explicitly requests a visibility
-change. See `docs/repositories.md` for the agreed roles and `docs/validation.md`
-for tested capabilities and pending work. Never assume the Atom still has the
+the research and Home Assistant repositories private. The user confirmed that
+this ESPHome repository should remain public on 2026-10-19; do not change any
+repository visibility without an explicit request. See `docs/repositories.md` for
+the agreed roles and `docs/validation.md` for tested capabilities and pending work. Never assume the Atom still has the
 same firmware or that another chat has closed its test probe.
 
 # Installation workflow
@@ -42,9 +43,9 @@ Wi-Fi, and API encryption stay in the user's local YAML/secrets. Use the API key
 for encrypted OTA; do not add a separate OTA password.
 Preserve existing names and keys when migrating an installed bridge. Keep the
 CLI example for development. Remote package and component refs must match.
-The user-facing installation workflow assumes future public source access and
-requires no GitHub token. This assumption does not authorize changing repository
-visibility; keep actual visibility unchanged until explicitly requested.
+The user-facing installation workflow uses public source access and requires no
+GitHub token. Keep credentials, captures and generated firmware out of the public
+repository.
 
 # Runtime setup
 
@@ -61,10 +62,13 @@ Runtime setup now stores a version-2 roster of up to eight fixtures. Keep persis
 UIDs stable across editing and never reuse a removed identity. Entities are
 registered before API enumeration only for configured records, as sub-devices
 whose names may change independently of identity. Runtime codegen reserves entity
-capacity; do not mix static entities/devices into that package. One shared hub
-rotates through fixtures, requiring fresh readback before commands. Keep per-light
-queues bounded/expiring and ensure offline lights and busy sliders cannot starve
-other polling. Discovery and roster saves clear every queue. Preserve v1 migration
+capacity; do not mix static entities/devices into that package. Each reserved slot
+has its own BLE client and protocol hub; keep healthy connections open and require
+fresh MAC-matched readback before commands. The seed `odelic_id`/BLE client supplies
+the first session, and codegen creates the remaining sessions. BLE slot accounting,
+S3 controller activity capacity and Bluedroid GATT application capacity must cover
+all sessions. Keep per-light queues bounded/expiring and ensure offline lights and
+busy sliders cannot starve other polling. Discovery and roster saves clear every queue. Preserve v1 migration
 and lock incompatible lists rather than overwriting them. See runtime-setup.md
 for restart, downgrade, capacity and Home Assistant registry limitations.
 

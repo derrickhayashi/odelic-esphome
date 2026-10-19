@@ -26,11 +26,13 @@ This repository covers the ESPHome implementation. The server-side Home
 Assistant repository currently contains design documentation only and has its own
 implementation roadmap.
 
-## Private GitHub origins
+## GitHub origins
 
 - Research: https://github.com/derrickhayashi/odelic-research
 - ESPHome: https://github.com/derrickhayashi/odelic-esphome
 - Home Assistant: https://github.com/derrickhayashi/odelic-home-assistant
 
-All three repositories are private. Their Git histories and pushes are
-independent; the server-side Home Assistant implementation remains planned.
+The ESPHome repository is public, as confirmed by the user on 2026-10-19. The
+research and Home Assistant repositories remain private. Their Git histories and
+pushes are independent; the server-side Home Assistant implementation remains
+planned.

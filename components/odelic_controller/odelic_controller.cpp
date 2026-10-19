@@ -3,56 +3,50 @@
 
 namespace esphome::odelic_controller {
 namespace {
+// Application policies: expire user intents and invalidate silent/offline fixtures.
 constexpr uint32_t COMMAND_TTL_MS = 60'000;
-constexpr uint32_t VISIT_BUDGET_MS = 20'000;
-constexpr uint32_t POLL_ALLOWANCE_PER_LIGHT_MS = 25'000;
-constexpr uint32_t STATE_VALIDITY_GRACE_MS = 30'000;
-constexpr uint32_t IDLE_DWELL_MS = 1'500;
+constexpr uint32_t STATE_STALE_MS = 30'000;
 }  // namespace
 
 void OdelicController::set_slot(size_t slot, odelic::OdelicLight *output, RosterLightState *state, RosterPreset *preset,
                                 RosterValid *valid) {
-  auto &runtime = slots_[slot];
+  auto &runtime = this->slots_[slot];
   runtime.output = output;
   runtime.state = state;
   runtime.preset = preset;
   runtime.valid = valid;
-  output->set_parent(hub_);
+  // Each slot owns its authentication mask, mesh mapping, query and command state.
+  // Never share a hub between MACs: login/session state belongs to that connection.
+  output->set_parent(runtime.hub);
   output->set_command_sink(this, slot);
-  preset->set_parent(hub_);
+  preset->set_parent(runtime.hub);
   preset->set_command_sink(this, slot);
+  runtime.hub->set_light(output);
+  runtime.hub->set_preset(preset);
+  runtime.hub->set_state_valid(valid);
 }
 
 void OdelicController::set_record(size_t slot, uint32_t uid, const std::string &name, uint64_t mac,
                                   const std::string &lighting_id, uint8_t unit, bool root_device) {
-  if (slot >= capacity_)
-    return;
-  records_[slot] = {uid, name, mac, lighting_id, unit, root_device};
+  if (slot < this->capacity_)
+    this->records_[slot] = {uid, name, mac, lighting_id, unit, root_device};
 }
 
-void OdelicController::clear_records() { records_ = {}; }
-
-size_t OdelicController::record_count_() const {
-  size_t count = 0;
-  for (size_t i = 0; i < capacity_; ++i)
-    if (records_[i].uid)
-      ++count;
-  return count;
-}
+void OdelicController::clear_records() { this->records_ = {}; }
 
 void OdelicController::setup() {
-  hub_->suspend_for_setup();
-  register_entities_();
-  initialized_ = true;
-  paused_ = false;
+  this->pause();
+  this->register_entities_();
+  this->initialized_ = true;
+  this->resume();
 }
 
 void OdelicController::register_entities_() {
-  for (size_t i = 0; i < capacity_; ++i) {
-    const auto &record = records_[i];
+  for (size_t i = 0; i < this->capacity_; ++i) {
+    const auto &record = this->records_[i];
     if (!record.uid)
       continue;
-    auto &runtime = slots_[i];
+    auto &runtime = this->slots_[i];
     if (!record.root_device) {
       runtime.device.set_device_id(record.uid);
       runtime.device.set_name(record.name.c_str());
@@ -70,129 +64,89 @@ void OdelicController::register_entities_() {
 }
 
 void OdelicController::pause() {
-  hub_->set_light(nullptr);
-  hub_->set_preset(nullptr);
-  hub_->set_state_valid(nullptr);
-  hub_->suspend_for_setup();
-  active_slot_ = -1;
-  current_read_ = false;
-  paused_ = true;
-  for (size_t i = 0; i < capacity_; ++i) {
-    slots_[i].queued = {};
-    slots_[i].seen = false;
-    if (slots_[i].valid != nullptr && records_[i].uid)
-      slots_[i].valid->publish_state(false);
+  this->paused_ = true;
+  for (size_t i = 0; i < this->capacity_; ++i) {
+    auto &runtime = this->slots_[i];
+    // Discovery/storage changes must stop ALL transports, including unused slots,
+    // and clear both controller queues and already-dispatched hub intents.
+    runtime.hub->suspend_for_setup();
+    runtime.queued = {};
+    runtime.started = runtime.seen = false;
+    if (this->records_[i].uid)
+      runtime.valid->publish_state(false);
   }
 }
 
-void OdelicController::resume() {
-  next_slot_ = 0;
-  paused_ = false;
+void OdelicController::resume() { this->paused_ = false; }
+
+bool OdelicController::transport_idle() const {
+  for (size_t i = 0; i < this->capacity_; ++i)
+    if (this->slots_[i].hub->parent()->state() != esp32_ble_tracker::ClientState::IDLE)
+      return false;
+  return true;
 }
 
 void OdelicController::light_command(size_t slot, bool on, float brightness) {
-  if (paused_ || slot >= capacity_ || !records_[slot].uid)
+  if (this->paused_ || slot >= this->capacity_ || !this->records_[slot].uid)
     return;
-  slots_[slot].queued = {odelic::protocol::Kind::LIGHT, on, odelic::protocol::quantize(brightness), 0};
-  slots_[slot].queued_at = millis();
+  this->slots_[slot].queued = {odelic::protocol::Kind::LIGHT, on, odelic::protocol::quantize(brightness), 0};
+  this->slots_[slot].queued_at = millis();
 }
 
 void OdelicController::preset_command(size_t slot, size_t preset) {
-  if (paused_ || slot >= capacity_ || !records_[slot].uid || preset >= 4)
+  if (this->paused_ || slot >= this->capacity_ || !this->records_[slot].uid || preset >= 4)
     return;
-  slots_[slot].queued = {odelic::protocol::Kind::PRESET, true, 20, odelic::protocol::PRESETS[preset]};
-  slots_[slot].queued_at = millis();
+  this->slots_[slot].queued = {odelic::protocol::Kind::PRESET, true, 20, odelic::protocol::PRESETS[preset]};
+  this->slots_[slot].queued_at = millis();
 }
 
 void OdelicController::loop() {
-  if (!initialized_ || paused_ || record_count_() == 0)
+  if (!this->initialized_ || this->paused_)
     return;
-  schedule_();
-}
-
-void OdelicController::schedule_() {
   const uint32_t now = millis();
-  const size_t count = record_count_();
-  const uint32_t stale_after = uint32_t(count) * POLL_ALLOWANCE_PER_LIGHT_MS + STATE_VALIDITY_GRACE_MS;
-  for (size_t i = 0; i < capacity_; ++i) {
-    auto &runtime = slots_[i];
+  for (size_t i = 0; i < this->capacity_; ++i) {
+    if (!this->records_[i].uid)
+      continue;
+    auto &runtime = this->slots_[i];
+    auto *hub = runtime.hub;
     if (runtime.queued.kind != odelic::protocol::Kind::NONE && now - runtime.queued_at >= COMMAND_TTL_MS)
       runtime.queued = {};
-    if (runtime.seen && now - runtime.seen_at > stale_after) {
+    if (!runtime.started) {
+      // Wait for asynchronous CLOSE/DISCONNECT before resuming a paused session.
+      if (hub->parent()->state() != esp32_ble_tracker::ClientState::IDLE)
+        continue;
+      const auto &record = this->records_[i];
+      hub->parent()->set_address(record.mac);
+      hub->set_lighting_id(record.lighting_id);
+      hub->set_unit(record.unit);
+      runtime.observed_revision = hub->state_revision();
+      runtime.started = true;
+      hub->resume_after_setup();
+    }
+    if (hub->state_revision() != runtime.observed_revision && hub->actual().known) {
+      runtime.observed_revision = hub->state_revision();
+      runtime.seen = true;
+      runtime.seen_at = now;
+      runtime.valid->publish_state(true);
+    }
+    if (!hub->actual().known || (runtime.seen && now - runtime.seen_at > STATE_STALE_MS)) {
       runtime.seen = false;
       runtime.valid->publish_state(false);
     }
-  }
-  if (active_slot_ < 0) {
-    if (hub_->parent()->state() != esp32_ble_tracker::ClientState::IDLE)
-      return;
-    int selected = -1;
-    for (unsigned pass = 0; pass < 3 && selected < 0; ++pass)
-      for (size_t n = 0; n < capacity_; ++n) {
-        size_t i = (next_slot_ + n) % capacity_;
-        const auto &runtime = slots_[i];
-        bool due = !runtime.visited || now - runtime.visited_at >= uint32_t(count) * POLL_ALLOWANCE_PER_LIGHT_MS;
-        bool choose = pass == 0 ? due : pass == 1 ? runtime.queued.kind != odelic::protocol::Kind::NONE : true;
-        if (records_[i].uid && choose) {
-          selected = int(i);
-          break;
-        }
-      }
-    if (selected < 0)
-      return;
-    active_slot_ = selected;
-    const auto &record = records_[selected];
-    auto &runtime = slots_[selected];
-    hub_->parent()->set_address(record.mac);
-    hub_->set_lighting_id(record.lighting_id);
-    hub_->set_unit(record.unit);
-    hub_->set_light(runtime.output);
-    hub_->set_preset(runtime.preset);
-    observed_revision_ = hub_->state_revision();
-    runtime.visited = true;
-    runtime.visited_at = now;
-    current_read_ = false;
-    visit_at_ = now;
-    hub_->resume_after_setup();
-    return;
-  }
-  auto &runtime = slots_[active_slot_];
-  if (hub_->state_revision() != observed_revision_ && hub_->actual().known) {
-    observed_revision_ = hub_->state_revision();
-    current_read_ = true;
-    read_at_ = now;
-    runtime.seen = true;
-    runtime.seen_at = now;
-    runtime.valid->publish_state(true);
-  }
-  if (current_read_ && hub_->ready() && !hub_->pending() && runtime.queued.kind != odelic::protocol::Kind::NONE) {
-    auto request = runtime.queued;
-    runtime.queued = {};
-    if (request.kind == odelic::protocol::Kind::LIGHT)
-      hub_->request_light(request.on, request.brightness / float(odelic::protocol::BRIGHTNESS_STEPS));
-    else
-      for (size_t i = 0; i < 4; ++i)
-        if (odelic::protocol::PRESETS[i] == request.color)
-          hub_->request_preset(i);
-    read_at_ = now;
-  }
-  const bool timed_out = now - visit_at_ >= VISIT_BUDGET_MS && (count > 1 || !current_read_ || !hub_->actual().known);
-  const bool rotate = count > 1 && current_read_ && hub_->ready() && !hub_->pending() &&
-                      runtime.queued.kind == odelic::protocol::Kind::NONE && now - read_at_ >= IDLE_DWELL_MS;
-  if (timed_out || rotate) {
-    if (timed_out) {
+    // Hub requests force another MAC-matched query before actuation. A cached
+    // valid flag alone never authorizes a write, including after reconnect.
+    if (runtime.seen && hub->ready() && !hub->pending() && runtime.queued.kind != odelic::protocol::Kind::NONE) {
+      auto request = runtime.queued;
       runtime.queued = {};
-      if (!current_read_ || !hub_->actual().known || hub_->pending() || !hub_->ready()) {
-        runtime.seen = false;
-        runtime.valid->publish_state(false);
-      }
+      if (request.kind == odelic::protocol::Kind::LIGHT)
+        hub->request_light(request.on, request.brightness / float(odelic::protocol::BRIGHTNESS_STEPS));
+      else
+        for (size_t preset = 0; preset < 4; ++preset)
+          if (odelic::protocol::PRESETS[preset] == request.color)
+            hub->request_preset(preset);
     }
-    next_slot_ = (size_t(active_slot_) + 1) % capacity_;
-    hub_->set_light(nullptr);
-    hub_->set_preset(nullptr);
-    hub_->suspend_for_setup();
-    active_slot_ = -1;
-    current_read_ = false;
+    // Keep healthy sessions connected. ESPHome reconnects each failed client
+    // independently; no offline fixture or busy slider gates another hub's loop.
   }
 }
 }  // namespace esphome::odelic_controller

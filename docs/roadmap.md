@@ -10,12 +10,12 @@ checks are recorded in [validation](validation.md).
 - Validate recovery after fixture wall-power loss and bridge reconnection,
   including state validity and command replay safeguards.
 
-## Validate runtime setup and multiple lights
+## Validate concurrent sessions and runtime setup
 
 - Exercise guided MAC discovery, saved configuration, restart, and fixture login
   on the AtomS3 Lite.
 - Confirm Home Assistant sub-device creation, rename, and removal for runtime
   fixtures.
-- Test BLE rotation and command isolation with at least two physical fixtures,
-  including power, brightness, presets, offline fixtures, and state freshness.
+- Validate offline-fixture recovery and state freshness while healthy sessions
+  stay connected.
 - Characterize responsiveness and reliability with larger saved rosters.
