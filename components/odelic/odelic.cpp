@@ -62,7 +62,7 @@ void OdelicHub::invalidate_() {
   status_set_warning();
 }
 void OdelicHub::fail_(const char *reason) {
-  ESP_LOGW(TAG, "%s", reason);
+  ESP_LOGW(TAG, "[%s] %s", this->parent()->address_str(), reason);
   invalidate_();
   intent_ = {};
   have_mask_ = have_own_ = have_fixture_ = false;
@@ -234,7 +234,7 @@ void OdelicHub::notify_(const uint8_t *data, size_t size) {
       fail_("Login rejected");
       return;
     }
-    ESP_LOGI(TAG, "Login accepted");
+    ESP_LOGI(TAG, "[%s] Login accepted", this->parent()->address_str());
     poll_due_ = true;
     phase_(Phase::READY);
     return;
@@ -304,9 +304,10 @@ void OdelicHub::publish_() {
       preset_->set_has_state(false);
   }
   if (actual_.levels)
-    ESP_LOGI(TAG, "Confirmed ON color=%u brightness=%u%%", actual_.color, 100 - actual_.dimming * 5);
+    ESP_LOGI(TAG, "[%s] Confirmed ON color=%u brightness=%u%%", this->parent()->address_str(), actual_.color,
+             100 - actual_.dimming * 5);
   else
-    ESP_LOGI(TAG, "Confirmed %s", actual_.on ? "ON (levels unavailable)" : "OFF");
+    ESP_LOGI(TAG, "[%s] Confirmed %s", this->parent()->address_str(), actual_.on ? "ON (levels unavailable)" : "OFF");
 }
 void OdelicHub::request_light(bool on, float brightness) {
   if (setup_suspended_)

@@ -1,4 +1,4 @@
-# Runtime roster: one shared BLE transport, up to eight saved fixtures.
+# Runtime roster: up to eight saved fixtures with independent BLE sessions.
 substitutions:
   odelic_max_lights: "8"
 esphome:
@@ -10,6 +10,9 @@ esp32:
     type: esp-idf
 logger:
   hardware_uart: USB_SERIAL_JTAG
+# One persistent client per roster slot; eight preserves the existing fixture limit.
+esp32_ble:
+  max_connections: 8
 esp32_ble_tracker:
   scan_parameters:
     active: false

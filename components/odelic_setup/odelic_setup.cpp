@@ -44,7 +44,7 @@ void OdelicSetup::setup() {
                             record.unit);
   }
   if (light_count(roster_) && message_ == "Enter details or start discovery.")
-    message_ = "Saved lights loaded. Connecting to each light in turn.";
+    message_ = "Saved lights loaded. Connecting to saved lights.";
   else if (!light_count(roster_) && message_ == "Enter details or start discovery.")
     message_ = "No saved lights. Add a light manually or use the guide.";
   // Four random 32-bit words become a per-boot 128-bit form token. It supplements

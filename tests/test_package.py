@@ -89,7 +89,7 @@ odelic_lighting_id: "00010007"
             finally:
                 CORE.reset()
 
-    def test_static_roster_supports_multiple_lights_on_one_transport(self):
+    def test_static_roster_reserves_independent_fixture_sessions(self):
         config = self.load(
             """esphome:
   name: static-multi-test

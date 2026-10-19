@@ -93,9 +93,9 @@ or a separate Bluetooth scanner.
 
 This is the recommended starting point when you already know the fixture's MAC
 address and lighting ID. They are entered once in Device Builder's secrets. The
-static setup is physically
-validated for one fixture. It can also be extended to a fixed list of lights,
-but those additional lights have not had physical hardware validation.
+static setup has been physically validated with two persistent BLE connections,
+including independent power, brightness and preset control. Larger fixed lists
+still need hardware reliability testing.
 
 1. Find the fixture's lighting ID and, for static setup, its Bluetooth MAC
    address using [Find your lighting ID and MAC](docs/find-fixture.md).
@@ -116,14 +116,15 @@ setup page to enter, discover, rename, edit, and remove lights. It supports a
 saved roster of 1–8 fixtures and gives each light its own Home Assistant
 sub-device.
 
-The runtime setup, storage, and build checks are passing. Multi-light hardware
-testing and Home Assistant acceptance are still pending, so treat this path as
-experimental.
+The shared concurrent controller passed a two-light static hardware test. Runtime
+setup, its Home Assistant acceptance and larger live rosters remain untested, so
+treat this path as experimental.
 
 ## Important limitations
 
-- Only one fixture connection is active at a time. With several lights,
-  readback and commands can take longer.
+- Each configured fixture has its own persistent BLE session, up to the existing
+  eight-fixture limit. Two concurrent fixtures have passed short hardware tests;
+  eight-fixture and long-duration reliability remain untested.
 - The bridge reports confirmed fixture state; a command acknowledgment alone is
   not treated as proof that the light changed.
 - The Odelic app or another controller should not be connected at the same
