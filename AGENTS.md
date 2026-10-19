@@ -28,12 +28,13 @@
 
 The three Git repositories have independent status and history. Explicitly
 select the working directory and read that repository's agent instructions before
-editing or pushing. A push here does not update the research repository. Keep all
+editing or pushing. A push here does not update the research repository. Keep
 the research and Home Assistant repositories private. The user confirmed that
 this ESPHome repository should remain public on 2026-10-19; do not change any
 repository visibility without an explicit request. See `docs/repositories.md` for
-the agreed roles and `docs/validation.md` for tested capabilities and pending work. Never assume the Atom still has the
-same firmware or that another chat has closed its test probe.
+the agreed roles and `docs/validation.md` for tested capabilities and pending work.
+Never assume the Atom still has the same firmware or that another chat has closed
+its test probe.
 
 # Installation workflow
 
@@ -68,9 +69,31 @@ fresh MAC-matched readback before commands. The seed `odelic_id`/BLE client supp
 the first session, and codegen creates the remaining sessions. BLE slot accounting,
 S3 controller activity capacity and Bluedroid GATT application capacity must cover
 all sessions. Keep per-light queues bounded/expiring and ensure offline lights and
-busy sliders cannot starve other polling. Discovery and roster saves clear every queue. Preserve v1 migration
-and lock incompatible lists rather than overwriting them. See runtime-setup.md
-for restart, downgrade, capacity and Home Assistant registry limitations.
+busy sliders cannot starve other polling. Discovery and roster saves clear every
+queue. Preserve v1 migration and lock incompatible lists rather than overwriting
+them. See `docs/runtime-setup.md` for restart, downgrade, capacity and Home
+Assistant registry limitations.
+
+# Connection capacity and hardware evidence
+
+- The roster/build ceiling remains eight fixtures. Both packages reserve eight
+  BLE stack connection slots by default; `esp32_ble.max_connections` must cover
+  the controller's reserved `max_lights` plus any other BLE clients. Validate
+  capacity rather than silently falling back to single-connection rotation.
+- Each configured fixture keeps an independent persistent BLE session. Preserve
+  separate authentication keys, MAC-matched mesh addresses, actual state and
+  pending transactions. Never reuse one fixture's session data for another.
+- Two simultaneous connections passed physical power, brightness, preset,
+  isolation and baseline-restoration tests on 2026-10-19. Eight-session builds and
+  host tests are not proof of eight live fixtures or long-duration reliability.
+- First-fixture Home Assistant UI control was previously verified. Both fixtures
+  appeared in Home Assistant live context, but second-fixture browser UI controls
+  remain untested. Runtime setup, remote/app-driven feedback and offline recovery
+  also require hardware acceptance. Consult `docs/concurrent-ble.md` and
+  `docs/validation.md` before updating tested-capability claims.
+- A recorded installed build is only a last-known observation. Verify current
+  firmware and controller ownership before using USB commands, the native API or
+  flashing. Keep machine-specific connection details in ignored local notes.
 
 # Machine-local working context
 
